@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>学習チェックリスト（週履歴付き）</title>
+<title>学習チェックリスト（項目別保存制限＆予定表表示）</title>
 <style>
   body {
     font-family: "Helvetica Neue", Arial, sans-serif;
@@ -27,9 +27,12 @@
     height: 1.4em;
     margin-right: 0.5em;
   }
+  input[type="checkbox"]:disabled + span {
+    color: #999;
+  }
   button {
     display: block;
-    margin: 1.5em auto;
+    margin: 1em auto;
     padding: 0.8em 2em;
     font-size: 1em;
     background-color: #2563eb;
@@ -48,232 +51,156 @@
     color: #ef4444;
     font-weight: bold;
   }
-  #week-summary {
-    margin-top: 2em;
+  #today-plan {
     background: white;
     padding: 1em;
+    margin-top: 1em;
     border-radius: 8px;
     box-shadow: 0 0 6px rgba(0,0,0,0.1);
   }
-  table {
+  #today-plan table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 0.5em;
   }
-  th, td {
+  #today-plan th, #today-plan td {
     border: 1px solid #ccc;
     padding: 0.4em 0.6em;
     text-align: center;
     font-size: 0.9em;
-  }
-  #toggleViewBtn {
-    margin-top: 1em;
-    background-color: #10b981;
   }
 </style>
 </head>
 <body>
 <h1>学習チェックリスト</h1>
 
-<div id="checklist-view">
-  <form id="checklist-form">
-    <label><input type="checkbox" id="word"> 英単語100語</label>
-    <label><input type="checkbox" id="long"> 長文1本＋音読</label>
-    <label><input type="checkbox" id="gobun"> 古文単語＋助動詞</label>
-    <label><input type="checkbox" id="gobun2"> 古文読解・文法演習</label>
-    <label><input type="checkbox" id="kanbun"> 漢文の句法学習</label>
-    <label><input type="checkbox" id="world"> 世界史 教科書精読</label>
-    <label><input type="checkbox" id="world2"> 世界史 一問一答</label>
-    <label><input type="checkbox" id="review"> 夜の復習10分</label>
-  </form>
+<form id="checklist-form">
+  <label><input type="checkbox" id="word"><span>英単語100語</span></label>
+  <label><input type="checkbox" id="long"><span>長文1本＋音読</span></label>
+  <label><input type="checkbox" id="gobun"><span>古文単語＋助動詞</span></label>
+  <label><input type="checkbox" id="gobun2"><span>古文読解・文法演習</span></label>
+  <label><input type="checkbox" id="kanbun"><span>漢文の句法学習</span></label>
+  <label><input type="checkbox" id="world"><span>世界史 教科書精読</span></label>
+  <label><input type="checkbox" id="world2"><span>世界史 一問一答</span></label>
+  <label><input type="checkbox" id="review"><span>夜の復習10分</span></label>
+</form>
 
-  <button id="saveBtn" onclick="save()" >保存</button>
-  <button onclick="resetChecklist()" >リセット</button>
-  <div id="message"></div>
+<button id="saveBtn">保存</button>
+<button id="showPlanBtn">今日の予定を見る</button>
+<div id="message"></div>
+
+<div id="today-plan" style="display:none;">
+  <h2>今日の予定表</h2>
+  <table>
+    <thead><tr><th>項目</th><th>チェック済み</th><th>保存済み</th></tr></thead>
+    <tbody id="planBody"></tbody>
+  </table>
+  <button id="closePlanBtn">閉じる</button>
 </div>
-
-<div id="history-view" style="display:none;">
-  <h2>週ごとの履歴</h2>
-  <select id="weekSelector"></select>
-  <div id="week-summary"></div>
-  <button id="backBtn">チェックリストに戻る</button>
-</div>
-
-<button id="toggleViewBtn">履歴を見る</button>
 
 <script>
   const keys = ["word", "long", "gobun", "gobun2", "kanbun", "world", "world2", "review"];
   const saveBtn = document.getElementById("saveBtn");
+  const showPlanBtn = document.getElementById("showPlanBtn");
   const messageEl = document.getElementById("message");
-  const checklistView = document.getElementById("checklist-view");
-  const historyView = document.getElementById("history-view");
-  const weekSelector = document.getElementById("weekSelector");
-  const weekSummary = document.getElementById("week-summary");
-  const toggleViewBtn = document.getElementById("toggleViewBtn");
-  const backBtn = document.getElementById("backBtn");
+  const todayPlanDiv = document.getElementById("today-plan");
+  const planBody = document.getElementById("planBody");
+  const closePlanBtn = document.getElementById("closePlanBtn");
 
-  // 今日の日付をyyyy-mm-dd形式で取得
   function getToday() {
     const d = new Date();
     return d.toISOString().slice(0,10);
   }
 
-  // 日付から週番号 (ISO 週番号) を計算する関数
-  function getWeekNumber(date) {
-    // date: yyyy-mm-dd文字列
-    const d = new Date(date + "T00:00:00");
-    // 木曜日基準で週番号を取得 (ISO 8601)
-    d.setHours(0,0,0,0);
-    d.setDate(d.getDate() + 4 - (d.getDay()||7));
-    const yearStart = new Date(d.getFullYear(),0,1);
-    const weekNo = Math.ceil(((d - yearStart) / 86400000 + 1)/7);
-    return {year: d.getFullYear(), week: weekNo};
+  // 各項目の保存済みかどうかを取得
+  function isSavedItemToday(item) {
+    return localStorage.getItem(`saved-${getToday()}-${item}`) === "true";
   }
 
-  // 週の開始日（月曜）を取得
-  function getWeekStartDate(year, week) {
-    const simple = new Date(year,0,1 + (week -1)*7);
-    const day = simple.getDay() || 7;
-    if(day !== 1) simple.setDate(simple.getDate() - day + 1);
-    return simple.toISOString().slice(0,10);
+  // 各項目のチェック済み状態を取得
+  function getCheckedState(item) {
+    return localStorage.getItem(`checklist-${getToday()}-${item}`) === "true";
   }
 
-  // 今日のチェック済みデータをlocalStorageから読み込み
+  // 各項目のチェック状態をフォームに反映
   function loadTodayChecks() {
-    const today = getToday();
-    let saved = localStorage.getItem("checklist-" + today);
-    if(saved) {
-      try {
-        const obj = JSON.parse(saved);
-        keys.forEach(k => {
-          document.getElementById(k).checked = !!obj[k];
-        });
-      } catch {
-        keys.forEach(k => document.getElementById(k).checked = false);
+    keys.forEach(item => {
+      const checked = getCheckedState(item);
+      document.getElementById(item).checked = checked;
+    });
+  }
+
+  // 各項目の保存済み状態に応じてチェックボックスのdisable切替
+  function updateCheckboxStatus() {
+    keys.forEach(item => {
+      const saved = isSavedItemToday(item);
+      const checkbox = document.getElementById(item);
+      if(saved) {
+        checkbox.disabled = true;
+      } else {
+        checkbox.disabled = false;
       }
-    } else {
-      keys.forEach(k => document.getElementById(k).checked = false);
-    }
+    });
   }
 
-  // 今日の保存済みフラグを取得
-  function isSavedToday() {
-    return localStorage.getItem("saved-" + getToday()) === "true";
-  }
-
-  // 保存ボタンの活性/非活性切り替え
-  function updateSaveButton() {
-    if(isSavedToday()) {
-      saveBtn.disabled = true;
-      messageEl.textContent = "今日の保存は完了しています。";
-    } else {
-      saveBtn.disabled = false;
-      messageEl.textContent = "";
-    }
+  // メッセージクリア
+  function clearMessage() {
+    messageEl.textContent = "";
   }
 
   // 保存処理
-  function save() {
-    if(isSavedToday()) {
-      alert("今日の保存はすでに完了しています。");
-      return;
-    }
+  saveBtn.addEventListener("click", () => {
+    clearMessage();
+    let anySaved = false;
     const today = getToday();
-    const data = {};
-    keys.forEach(k => {
-      data[k] = document.getElementById(k).checked;
-    });
-    // localStorageに保存
-    localStorage.setItem("checklist-" + today, JSON.stringify(data));
-    localStorage.setItem("saved-" + today, "true");
 
-    // 週履歴データを更新
-    updateWeeklySummary(today, data);
-
-    updateSaveButton();
-    alert("保存しました！");
-  }
-
-  // 週履歴をlocalStorageに保存／更新
-  function updateWeeklySummary(dateStr, dayData) {
-    const {year, week} = getWeekNumber(dateStr);
-    const key = `week-summary-${year}-${week}`;
-    let summary = localStorage.getItem(key);
-    let obj = summary ? JSON.parse(summary) : {};
-
-    // 各項目のtrue回数をカウント
-    keys.forEach(k => {
-      obj[k] = (obj[k]||0) + (dayData[k] ? 1 : 0);
+    keys.forEach(item => {
+      const checkbox = document.getElementById(item);
+      const checked = checkbox.checked;
+      if(checked && !isSavedItemToday(item)) {
+        // 保存されてなければ保存
+        localStorage.setItem(`checklist-${today}-${item}`, "true");
+        localStorage.setItem(`saved-${today}-${item}`, "true");
+        anySaved = true;
+      } else if(!checked && !isSavedItemToday(item)) {
+        // 未チェックなら保存しないけどlocalStorageはfalseにする
+        localStorage.setItem(`checklist-${today}-${item}`, "false");
+      }
     });
 
-    localStorage.setItem(key, JSON.stringify(obj));
-  }
-
-  // 過去7週分の週一覧を作る
-  function buildWeekSelector() {
-    const now = new Date();
-    let options = "";
-    for(let i=0; i<7; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7*i);
-      const {year, week} = getWeekNumber(d.toISOString().slice(0,10));
-      const start = getWeekStartDate(year, week);
-      options += `<option value="${year}-${week}">${year}年 第${week}週 (開始日:${start})</option>`;
-    }
-    weekSelector.innerHTML = options;
-  }
-
-  // 週ごとの履歴表示
-  function showWeekSummary() {
-    const val = weekSelector.value;
-    if(!val) return;
-    const [year, week] = val.split("-");
-    const key = `week-summary-${year}-${week}`;
-    let summary = localStorage.getItem(key);
-    let obj = summary ? JSON.parse(summary) : {};
-
-    let html = "<table><thead><tr><th>項目</th><th>回数</th></tr></thead><tbody>";
-    keys.forEach(k => {
-      html += `<tr><td>${k}</td><td>${obj[k] || 0}回</td></tr>`;
-    });
-    html += "</tbody></table>";
-
-    weekSummary.innerHTML = html;
-  }
-
-  // チェックリストと履歴表示切替
-  toggleViewBtn.addEventListener("click", () => {
-    if(checklistView.style.display === "none") {
-      checklistView.style.display = "block";
-      historyView.style.display = "none";
-      toggleViewBtn.textContent = "履歴を見る";
+    if(anySaved) {
+      messageEl.style.color = "green";
+      messageEl.textContent = "保存しました！保存済みの項目は編集できません。";
+      updateCheckboxStatus();
     } else {
-      checklistView.style.display = "none";
-      historyView.style.display = "block";
-      toggleViewBtn.textContent = "チェックリストに戻る";
-      buildWeekSelector();
-      showWeekSummary();
+      messageEl.style.color = "#ef4444";
+      messageEl.textContent = "保存できる項目がありません。";
     }
   });
 
-  backBtn.addEventListener("click", () => {
-    checklistView.style.display = "block";
-    historyView.style.display = "none";
-    toggleViewBtn.textContent = "履歴を見る";
+  // 今日の予定表を表示
+  showPlanBtn.addEventListener("click", () => {
+    planBody.innerHTML = "";
+    keys.forEach(item => {
+      const checkbox = document.getElementById(item);
+      const checked = checkbox.checked ? "✅" : "❌";
+      const saved = isSavedItemToday(item) ? "✔️" : "✖️";
+      const labelText = checkbox.nextSibling.textContent;
+      planBody.insertAdjacentHTML("beforeend",
+        `<tr><td>${labelText}</td><td>${checked}</td><td>${saved}</td></tr>`);
+    });
+    todayPlanDiv.style.display = "block";
   });
 
-  // リセット処理（チェックリストだけクリア、保存は消さない）
-  function resetChecklist() {
-    keys.forEach(k => document.getElementById(k).checked = false);
-  }
+  closePlanBtn.addEventListener("click", () => {
+    todayPlanDiv.style.display = "none";
+  });
 
-  // ページ初期化
-  function init() {
+  // 初期化
+  window.onload = () => {
     loadTodayChecks();
-    updateSaveButton();
+    updateCheckboxStatus();
+    clearMessage();
   }
-
-  window.onload = init;
 </script>
-
 </body>
 </html>
