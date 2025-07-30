@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>学習チェックリスト（項目別保存制限＆予定表表示）</title>
+<title>学習チェックリスト＆予定表（30分刻み）</title>
 <style>
   body {
     font-family: "Helvetica Neue", Arial, sans-serif;
     padding: 1em;
     background: #f8fafc;
-    max-width: 480px;
+    max-width: 600px;
     margin: auto;
   }
   h1, h2 {
@@ -19,7 +19,7 @@
   label {
     display: flex;
     align-items: center;
-    margin: 0.8em 0;
+    margin: 0.6em 0;
     font-size: 1.1em;
   }
   input[type="checkbox"] {
@@ -27,19 +27,21 @@
     height: 1.4em;
     margin-right: 0.5em;
   }
-  input[type="checkbox"]:disabled + span {
-    color: #999;
+  input[type="text"], select {
+    flex: 1;
+    font-size: 1em;
+    padding: 0.3em 0.5em;
   }
   button {
-    display: block;
     margin: 1em auto;
-    padding: 0.8em 2em;
+    padding: 0.7em 2em;
     font-size: 1em;
     background-color: #2563eb;
     border: none;
     border-radius: 6px;
     color: white;
     cursor: pointer;
+    display: block;
   }
   button:disabled {
     background-color: #999;
@@ -51,156 +53,256 @@
     color: #ef4444;
     font-weight: bold;
   }
-  #today-plan {
-    background: white;
-    padding: 1em;
-    margin-top: 1em;
-    border-radius: 8px;
-    box-shadow: 0 0 6px rgba(0,0,0,0.1);
+  #tabs {
+    text-align: center;
+    margin-bottom: 1em;
   }
-  #today-plan table {
+  #tabs button {
+    margin: 0 0.5em;
+    padding: 0.5em 1.5em;
+    font-weight: bold;
+  }
+  #checklist-view, #schedule-view {
+    display: none;
+  }
+  #checklist-view.active, #schedule-view.active {
+    display: block;
+  }
+  table {
     width: 100%;
     border-collapse: collapse;
+    margin-top: 0.5em;
   }
-  #today-plan th, #today-plan td {
+  th, td {
     border: 1px solid #ccc;
     padding: 0.4em 0.6em;
     text-align: center;
-    font-size: 0.9em;
   }
 </style>
 </head>
 <body>
-<h1>学習チェックリスト</h1>
+<h1>学習チェックリスト＆予定表</h1>
 
-<form id="checklist-form">
-  <label><input type="checkbox" id="word"><span>英単語100語</span></label>
-  <label><input type="checkbox" id="long"><span>長文1本＋音読</span></label>
-  <label><input type="checkbox" id="gobun"><span>古文単語＋助動詞</span></label>
-  <label><input type="checkbox" id="gobun2"><span>古文読解・文法演習</span></label>
-  <label><input type="checkbox" id="kanbun"><span>漢文の句法学習</span></label>
-  <label><input type="checkbox" id="world"><span>世界史 教科書精読</span></label>
-  <label><input type="checkbox" id="world2"><span>世界史 一問一答</span></label>
-  <label><input type="checkbox" id="review"><span>夜の復習10分</span></label>
-</form>
+<div id="tabs">
+  <button id="tabChecklist" class="active">チェックリスト</button>
+  <button id="tabSchedule">予定表（30分刻み）</button>
+</div>
 
-<button id="saveBtn">保存</button>
-<button id="showPlanBtn">今日の予定を見る</button>
-<div id="message"></div>
+<!-- チェックリスト画面 -->
+<div id="checklist-view" class="active">
+  <form id="checklist-form">
+    <!-- 項目はここにJSで追加 -->
+  </form>
+  <button id="saveChecklistBtn">保存</button>
+  <div id="message"></div>
+</div>
 
-<div id="today-plan" style="display:none;">
-  <h2>今日の予定表</h2>
+<!-- 予定表画面 -->
+<div id="schedule-view">
   <table>
-    <thead><tr><th>項目</th><th>チェック済み</th><th>保存済み</th></tr></thead>
-    <tbody id="planBody"></tbody>
+    <thead>
+      <tr><th>時間</th><th>予定</th></tr>
+    </thead>
+    <tbody id="scheduleBody">
+      <!-- JSで30分刻みのスロット作成 -->
+    </tbody>
   </table>
-  <button id="closePlanBtn">閉じる</button>
+  <button id="saveScheduleBtn">予定保存</button>
 </div>
 
 <script>
-  const keys = ["word", "long", "gobun", "gobun2", "kanbun", "world", "world2", "review"];
-  const saveBtn = document.getElementById("saveBtn");
-  const showPlanBtn = document.getElementById("showPlanBtn");
+  const standardItems = [
+    "英単語100語",
+    "長文1本＋音読",
+    "古文単語＋助動詞",
+    "古文読解・文法演習",
+    "漢文の句法学習",
+    "世界史 教科書精読",
+    "世界史 一問一答",
+    "夜の復習10分"
+  ];
+
+  // localStorageキー
+  const TODAY = new Date().toISOString().slice(0,10);
+  const CUSTOM_ITEMS_KEY = `customItems-${TODAY}`;
+  const CHECKED_ITEMS_KEY = `checkedItems-${TODAY}`;
+  const SCHEDULE_KEY = `schedule-${TODAY}`;
+
+  // DOM要素
+  const checklistForm = document.getElementById("checklist-form");
+  const saveChecklistBtn = document.getElementById("saveChecklistBtn");
   const messageEl = document.getElementById("message");
-  const todayPlanDiv = document.getElementById("today-plan");
-  const planBody = document.getElementById("planBody");
-  const closePlanBtn = document.getElementById("closePlanBtn");
+  const scheduleBody = document.getElementById("scheduleBody");
+  const saveScheduleBtn = document.getElementById("saveScheduleBtn");
+  const tabChecklist = document.getElementById("tabChecklist");
+  const tabSchedule = document.getElementById("tabSchedule");
+  const checklistView = document.getElementById("checklist-view");
+  const scheduleView = document.getElementById("schedule-view");
 
-  function getToday() {
-    const d = new Date();
-    return d.toISOString().slice(0,10);
+  // チェックリスト項目を表示する関数
+  function renderChecklist() {
+    checklistForm.innerHTML = "";
+    // 標準項目
+    standardItems.forEach((item, i) => {
+      checklistForm.insertAdjacentHTML("beforeend",
+        `<label><input type="checkbox" id="item-${i}" data-name="${item}">${item}</label>`);
+    });
+    // カスタム項目
+    const customItems = JSON.parse(localStorage.getItem(CUSTOM_ITEMS_KEY) || "[]");
+    customItems.forEach((item, i) => {
+      checklistForm.insertAdjacentHTML("beforeend",
+        `<label><input type="checkbox" id="custom-${i}" data-name="${item}">${item}</label>`);
+    });
+    loadCheckedState();
   }
 
-  // 各項目の保存済みかどうかを取得
-  function isSavedItemToday(item) {
-    return localStorage.getItem(`saved-${getToday()}-${item}`) === "true";
-  }
-
-  // 各項目のチェック済み状態を取得
-  function getCheckedState(item) {
-    return localStorage.getItem(`checklist-${getToday()}-${item}`) === "true";
-  }
-
-  // 各項目のチェック状態をフォームに反映
-  function loadTodayChecks() {
-    keys.forEach(item => {
-      const checked = getCheckedState(item);
-      document.getElementById(item).checked = checked;
+  // チェック状態をlocalStorageから読み込んでフォームに反映
+  function loadCheckedState() {
+    const checked = JSON.parse(localStorage.getItem(CHECKED_ITEMS_KEY) || "{}");
+    document.querySelectorAll("#checklist-form input[type=checkbox]").forEach(cb => {
+      const name = cb.getAttribute("data-name");
+      cb.checked = !!checked[name];
     });
   }
 
-  // 各項目の保存済み状態に応じてチェックボックスのdisable切替
-  function updateCheckboxStatus() {
-    keys.forEach(item => {
-      const saved = isSavedItemToday(item);
-      const checkbox = document.getElementById(item);
-      if(saved) {
-        checkbox.disabled = true;
-      } else {
-        checkbox.disabled = false;
+  // チェック状態を保存
+  function saveCheckedState() {
+    const checked = {};
+    document.querySelectorAll("#checklist-form input[type=checkbox]").forEach(cb => {
+      const name = cb.getAttribute("data-name");
+      checked[name] = cb.checked;
+    });
+    localStorage.setItem(CHECKED_ITEMS_KEY, JSON.stringify(checked));
+  }
+
+  // 30分刻み時間帯を作る関数 (例: 9:00〜21:00)
+  function generateTimeSlots() {
+    const slots = [];
+    for(let h=9; h<=21; h++) {
+      slots.push({label: `${String(h).padStart(2,"0")}:00`, value: `${String(h).padStart(2,"0")}:00`});
+      if(h !== 21) {
+        slots.push({label: `${String(h).padStart(2,"0")}:30`, value: `${String(h).padStart(2,"0")}:30`});
       }
-    });
-  }
-
-  // メッセージクリア
-  function clearMessage() {
-    messageEl.textContent = "";
-  }
-
-  // 保存処理
-  saveBtn.addEventListener("click", () => {
-    clearMessage();
-    let anySaved = false;
-    const today = getToday();
-
-    keys.forEach(item => {
-      const checkbox = document.getElementById(item);
-      const checked = checkbox.checked;
-      if(checked && !isSavedItemToday(item)) {
-        // 保存されてなければ保存
-        localStorage.setItem(`checklist-${today}-${item}`, "true");
-        localStorage.setItem(`saved-${today}-${item}`, "true");
-        anySaved = true;
-      } else if(!checked && !isSavedItemToday(item)) {
-        // 未チェックなら保存しないけどlocalStorageはfalseにする
-        localStorage.setItem(`checklist-${today}-${item}`, "false");
-      }
-    });
-
-    if(anySaved) {
-      messageEl.style.color = "green";
-      messageEl.textContent = "保存しました！保存済みの項目は編集できません。";
-      updateCheckboxStatus();
-    } else {
-      messageEl.style.color = "#ef4444";
-      messageEl.textContent = "保存できる項目がありません。";
     }
-  });
-
-  // 今日の予定表を表示
-  showPlanBtn.addEventListener("click", () => {
-    planBody.innerHTML = "";
-    keys.forEach(item => {
-      const checkbox = document.getElementById(item);
-      const checked = checkbox.checked ? "✅" : "❌";
-      const saved = isSavedItemToday(item) ? "✔️" : "✖️";
-      const labelText = checkbox.nextSibling.textContent;
-      planBody.insertAdjacentHTML("beforeend",
-        `<tr><td>${labelText}</td><td>${checked}</td><td>${saved}</td></tr>`);
-    });
-    todayPlanDiv.style.display = "block";
-  });
-
-  closePlanBtn.addEventListener("click", () => {
-    todayPlanDiv.style.display = "none";
-  });
-
-  // 初期化
-  window.onload = () => {
-    loadTodayChecks();
-    updateCheckboxStatus();
-    clearMessage();
+    return slots;
   }
+
+  // 予定表を表示
+  function renderSchedule() {
+    scheduleBody.innerHTML = "";
+    const slots = generateTimeSlots();
+    const schedule = JSON.parse(localStorage.getItem(SCHEDULE_KEY) || "{}");
+    const customItems = JSON.parse(localStorage.getItem(CUSTOM_ITEMS_KEY) || "[]");
+
+    slots.forEach(slot => {
+      const selId = `select-${slot.value}`;
+      const inputId = `input-${slot.value}`;
+      const val = schedule[slot.value] || "";
+
+      // 選択肢は標準項目 + カスタム項目 + 空欄
+      let options = `<option value="">（何もしない・自由入力）</option>`;
+      standardItems.forEach(item => {
+        options += `<option value="${item}">${item}</option>`;
+      });
+      customItems.forEach(item => {
+        options += `<option value="${item}">${item}</option>`;
+      });
+
+      // 予定表の1行を作成
+      scheduleBody.insertAdjacentHTML("beforeend", `
+        <tr>
+          <td>${slot.label}</td>
+          <td>
+            <select id="${selId}" style="width:70%;">
+              ${options}
+            </select>
+            <input type="text" id="${inputId}" placeholder="新規予定を入力" style="width:28%; margin-left:2%;" />
+            <button type="button" data-slot="${slot.value}" class="addCustomBtn">追加</button>
+          </td>
+        </tr>
+      `);
+
+      // 選択肢にあれば選択状態にする
+      if(val && document.getElementById(selId)) {
+        document.getElementById(selId).value = val;
+      }
+    });
+
+    // イベントリスナーを後付け
+    document.querySelectorAll(".addCustomBtn").forEach(btn => {
+      btn.addEventListener("click", e => {
+        const slot = e.target.dataset.slot;
+        const inputEl = document.getElementById(`input-${slot}`);
+        const val = inputEl.value.trim();
+        if(!val) {
+          alert("予定名を入力してください");
+          return;
+        }
+        addCustomItem(val);
+        // 選択肢に追加してセット
+        const selectEl = document.getElementById(`select-${slot}`);
+        const opt = document.createElement("option");
+        opt.value = val;
+        opt.textContent = val;
+        selectEl.appendChild(opt);
+        selectEl.value = val;
+        inputEl.value = "";
+      });
+    });
+  }
+
+  // カスタム項目を追加し保存
+  function addCustomItem(itemName) {
+    const customItems = JSON.parse(localStorage.getItem(CUSTOM_ITEMS_KEY) || "[]");
+    if(customItems.includes(itemName)) return; // 重複防止
+    customItems.push(itemName);
+    localStorage.setItem(CUSTOM_ITEMS_KEY, JSON.stringify(customItems));
+    renderChecklist();
+  }
+
+  // 予定表の選択内容を保存
+  function saveSchedule() {
+    const slots = generateTimeSlots();
+    const schedule = {};
+    slots.forEach(slot => {
+      const selEl = document.getElementById(`select-${slot.value}`);
+      if(selEl) {
+        schedule[slot.value] = selEl.value;
+      }
+    });
+    localStorage.setItem(SCHEDULE_KEY, JSON.stringify(schedule));
+    alert("予定表を保存しました！");
+  }
+
+  // タブ切り替え
+  tabChecklist.addEventListener("click", () => {
+    tabChecklist.classList.add("active");
+    tabSchedule.classList.remove("active");
+    checklistView.classList.add("active");
+    scheduleView.classList.remove("active");
+  });
+  tabSchedule.addEventListener("click", () => {
+    tabSchedule.classList.add("active");
+    tabChecklist.classList.remove("active");
+    scheduleView.classList.add("active");
+    checklistView.classList.remove("active");
+  });
+
+  // 初期表示処理
+  function init() {
+    renderChecklist();
+    renderSchedule();
+  }
+
+  saveChecklistBtn.addEventListener("click", () => {
+    saveCheckedState();
+    alert("チェックリストを保存しました！");
+  });
+  saveScheduleBtn.addEventListener("click", () => {
+    saveSchedule();
+  });
+
+  window.onload = init;
 </script>
 </body>
 </html>
