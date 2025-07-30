@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>学習チェックリスト（スマホ対応）</title>
+<style>
+  body {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    padding: 1em;
+    background: #f8fafc;
+    max-width: 480px;
+    margin: auto;
+  }
+  h1 {
+    text-align: center;
+    color: #334155;
+  }
+  label {
+    display: flex;
+    align-items: center;
+    margin: 1em 0;
+    font-size: 1.1em;
+  }
+  input[type="checkbox"] {
+    width: 1.4em;
+    height: 1.4em;
+    margin-right: 0.5em;
+  }
+  button {
+    display: block;
+    margin: 1.5em auto;
+    padding: 0.8em 2em;
+    font-size: 1em;
+    background-color: #2563eb;
+    border: none;
+    border-radius: 6px;
+    color: white;
+  }
+</style>
+</head>
+<body>
+<h1>学習チェックリスト</h1>
+<label><input type="checkbox" id="word"> 英単語100語</label>
+<label><input type="checkbox" id="long"> 長文1本＋音読</label>
+<label><input type="checkbox" id="gobun"> 古文単語＋助動詞</label>
+<label><input type="checkbox" id="world"> 世界史 教科書精読</label>
+<label><input type="checkbox" id="review"> 夜の復習10分</label>
+<button onclick="save()">保存</button>
+<button onclick="reset()">リセット</button>
+
+<script>
+  const keys = ["word", "long", "gobun", "world", "review"];
+
+  // ページ読み込み時にlocalStorageから値を読み込む
+  keys.forEach(id => {
+    document.getElementById(id).checked = localStorage.getItem(id) === "true";
+  });
+
+  function save() {
+    keys.forEach(id => {
+      localStorage.setItem(id, document.getElementById(id).checked);
+    });
+    alert("保存しました！");
+  }
+
+  function reset() {
+    keys.forEach(id => {
+      localStorage.setItem(id, false);
+      document.getElementById(id).checked = false;
+    });
+  }
+</script>
+</body>
+</html>
