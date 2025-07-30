@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>簡易スケジューラー</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
   body {
     font-family: "Helvetica Neue", Arial, sans-serif;
@@ -18,32 +19,26 @@
   }
   #container {
     display: flex;
+    flex-direction: column;
     gap: 1em;
+  }
+  @media (min-width: 768px) {
+    #container {
+      flex-direction: row;
+    }
+  }
+  #items, #timeline {
+    border: 1px solid #ccc;
+    padding: 0.5em;
+    background: white;
   }
   #items {
     flex: 1;
-    border: 1px solid #ccc;
-    padding: 0.5em;
     max-height: 600px;
     overflow-y: auto;
   }
-  #items h2 {
-    margin-top: 0;
-    text-align: center;
-  }
-  .item-block {
-    background: #2563eb;
-    color: white;
-    padding: 0.5em;
-    margin: 0.3em 0;
-    border-radius: 4px;
-    cursor: pointer;
-    user-select: none;
-  }
   #timeline {
     flex: 2;
-    border: 1px solid #ccc;
-    padding: 0.5em;
     max-height: 600px;
     overflow-y: auto;
     position: relative;
@@ -61,67 +56,65 @@
     position: absolute;
     left: 100px;
     right: 10px;
-    background: #3b82f6;
     color: white;
     border-radius: 4px;
     padding: 4px 8px;
     box-sizing: border-box;
     cursor: pointer;
     user-select: none;
+    font-size: 0.9em;
   }
-  .controls {
-    margin-top: 0.2em;
-    text-align: right;
+  .controls button {
+    margin: 2px;
+    padding: 2px 6px;
+    font-size: 0.75em;
   }
-  button {
-    margin-left: 0.3em;
-    padding: 0.2em 0.6em;
-    font-size: 0.85em;
-  }
-  #selectedItem {
-    margin-bottom: 1em;
-    text-align: center;
-    font-weight: bold;
+  .item-block {
+    background: #2563eb;
+    color: white;
+    padding: 0.5em;
+    margin: 0.3em 0;
+    border-radius: 4px;
+    cursor: pointer;
+    user-select: none;
   }
 </style>
 </head>
 <body>
 <h1>簡易スケジューラー</h1>
-
 <div id="container">
   <div id="items">
     <h2>項目一覧</h2>
     <div id="itemList"></div>
     <input type="text" id="newItemInput" placeholder="新しい項目を追加" />
     <button id="addItemBtn">追加</button>
+    <hr />
+    <button onclick="saveTemplate()">テンプレ保存</button>
+    <button onclick="loadTemplate()">テンプレ読込</button>
+    <button onclick="showHistory()">履歴表示</button>
+    <button onclick="showSummary()">週グラフ</button>
   </div>
-
   <div id="timeline">
     <div id="selectedItem">※ 左の項目をクリックして選択してください</div>
     <div id="timeSlots"></div>
   </div>
 </div>
-
+<div id="modal" style="display:none; position:fixed; top:10%; left:10%; right:10%; bottom:10%; background:white; padding:1em; border:2px solid #333; overflow:auto; z-index:9999">
+  <button onclick="document.getElementById('modal').style.display='none'">閉じる</button>
+  <div id="modalContent"></div>
+</div>
 <script>
-  // 定数
   const TIME_START_HOUR = 8;
   const TIME_END_HOUR = 23;
   const SLOT_HEIGHT_PX = 40;
-  const SLOT_MINUTES = 30;
-
-  // 状態
   let items = JSON.parse(localStorage.getItem("scheduler_items") || "[]");
-  let schedule = JSON.parse(localStorage.getItem("scheduler_schedule") || "[]"); 
-  // scheduleは配列：{item: "英単語", start: "08:00", length: 1} （lengthは30分単位）
+  let schedule = JSON.parse(localStorage.getItem("scheduler_schedule") || "[]");
+  const today = new Date().toISOString().split("T")[0];
   let selectedItem = null;
-
-  const itemListEl = document.getElementById("itemList");
-  const newItemInput = document.getElementById("newItemInput");
-  const addItemBtn = document.getElementById("addItemBtn");
   const timeSlotsEl = document.getElementById("timeSlots");
-  const selectedItemEl = document.getElementById("selectedItem");
+  const itemListEl = document.getElementById("itemList");
+  const modalContent = document.getElementById("modalContent");
 
-  // 時間スロット生成
   function generateTimeSlots() {
     const slots = [];
     for(let h = TIME_START_HOUR; h <= TIME_END_HOUR; h++) {
@@ -131,169 +124,155 @@
     return slots;
   }
 
-  // アイテムリスト表示
   function renderItems() {
     itemListEl.innerHTML = "";
-    items.forEach((item,i) => {
+    items.forEach((item) => {
       const div = document.createElement("div");
       div.textContent = item;
       div.className = "item-block";
       div.onclick = () => {
         selectedItem = item;
-        selectedItemEl.textContent = `選択中の項目：${item}`;
+        document.getElementById("selectedItem").textContent = `選択中の項目：${item}`;
       };
       itemListEl.appendChild(div);
     });
   }
 
-  // 時間スロット表示＋スケジュール済みブロック描画
-  function renderTimeline() {
-    timeSlotsEl.innerHTML = "";
-    const slots = generateTimeSlots();
+  function getColorForIndex(index) {
+    const colors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#6366f1", "#ec4899"];
+    return colors[index % colors.length];
+  }
 
-    // 各スロットdiv
-    slots.forEach((slot,i) => {
+  function renderTimeline() {
+    const slots = generateTimeSlots();
+    timeSlotsEl.innerHTML = "";
+    slots.forEach((slot, i) => {
       const div = document.createElement("div");
       div.className = "time-slot";
       div.textContent = slot;
-      div.dataset.time = slot;
-
       div.onclick = () => {
-        if(!selectedItem) {
-          alert("左側から項目を選択してください");
-          return;
-        }
-        // すでに重複してないかチェック
-        if(isOverlapping(slot, 1)) {
-          alert("この時間帯はすでに予定があります");
-          return;
-        }
-        // 新規スケジュール追加
-        schedule.push({item: selectedItem, start: slot, length:1});
+        if (!selectedItem) return alert("項目を選んでください");
+        if (isOverlapping(slot, 1)) return alert("重複しています");
+        schedule.push({item: selectedItem, start: slot, length: 1, date: today});
         saveData();
         renderTimeline();
       };
-
       timeSlotsEl.appendChild(div);
     });
 
-    // スケジュール済みブロックを描画
-    schedule.forEach((sch, idx) => {
-      const topIndex = slots.indexOf(sch.start);
-      if(topIndex === -1) return;
+    schedule.filter(s => s.date === today).forEach((s, i) => {
+      const si = slots.indexOf(s.start);
+      const ei = si + s.length;
+      const end = slots[ei] || "";
       const block = document.createElement("div");
       block.className = "scheduled-block";
-      block.style.top = (topIndex * SLOT_HEIGHT_PX) + "px";
-      block.style.height = (sch.length * SLOT_HEIGHT_PX - 4) + "px";
-      block.textContent = sch.item;
-
-      // 操作ボタン
-      const controls = document.createElement("div");
-      controls.className = "controls";
-
-      const btnPlus = document.createElement("button");
-      btnPlus.textContent = "+30分";
-      btnPlus.onclick = (e) => {
-        e.stopPropagation();
-        // 延長チェック 重複防止
-        if(!canResize(sch, sch.length+1)) {
-          alert("これ以上伸ばせません");
-          return;
-        }
-        sch.length++;
-        saveData();
-        renderTimeline();
-      };
-
-      const btnMinus = document.createElement("button");
-      btnMinus.textContent = "-30分";
-      btnMinus.onclick = (e) => {
-        e.stopPropagation();
-        if(sch.length <= 1) {
-          // 削除扱い
-          if(confirm("予定を削除しますか？")) {
-            schedule.splice(idx,1);
-            saveData();
-            renderTimeline();
-          }
-          return;
-        }
-        sch.length--;
-        saveData();
-        renderTimeline();
-      };
-
-      controls.appendChild(btnPlus);
-      controls.appendChild(btnMinus);
-      block.appendChild(controls);
-
+      block.style.top = (si * SLOT_HEIGHT_PX) + "px";
+      block.style.height = (s.length * SLOT_HEIGHT_PX - 4) + "px";
+      block.style.backgroundColor = getColorForIndex(i);
+      block.innerHTML = `<strong>${s.item}</strong><br><small>${s.start}〜${end}</small>`;
+      const c = document.createElement("div");
+      c.className = "controls";
+      c.innerHTML = `<button onclick="resize(${i},1)">+30分</button><button onclick="resize(${i},-1)">-30分</button>`;
+      block.appendChild(c);
       timeSlotsEl.appendChild(block);
     });
   }
 
-  // 重複チェック（スロット時間文字列と長さ）  
-  function isOverlapping(startTime, length) {
-    const slots = generateTimeSlots();
-    const startIndex = slots.indexOf(startTime);
-    if(startIndex === -1) return true;
-    const endIndex = startIndex + length -1;
-    for(let i = 0; i < schedule.length; i++) {
-      const sch = schedule[i];
-      const schStart = slots.indexOf(sch.start);
-      const schEnd = schStart + sch.length -1;
-      // 重なりチェック
-      if(!(endIndex < schStart || startIndex > schEnd)) {
-        return true;
-      }
+  function resize(i, d) {
+    const s = schedule.filter(e => e.date === today)[i];
+    if (d > 0 && !isOverlapping(s.start, s.length + d)) s.length += d;
+    else if (d < 0) {
+      if (s.length === 1) schedule = schedule.filter(e => e !== s);
+      else s.length += d;
     }
-    return false;
-  }
-  // 伸縮可能かチェック（重複回避）
-  function canResize(sch, newLength) {
-    const slots = generateTimeSlots();
-    const startIndex = slots.indexOf(sch.start);
-    const endIndex = startIndex + newLength -1;
-    for(let i=0; i<schedule.length; i++) {
-      if(schedule[i] === sch) continue;
-      const sStart = slots.indexOf(schedule[i].start);
-      const sEnd = sStart + schedule[i].length -1;
-      if(!(endIndex < sStart || startIndex > sEnd)) {
-        return false;
-      }
-    }
-    if(endIndex >= slots.length) return false; // 時間外
-    return true;
+    saveData();
+    renderTimeline();
   }
 
-  // データ保存
+  function isOverlapping(start, length) {
+    const slots = generateTimeSlots();
+    const si = slots.indexOf(start);
+    const ei = si + length - 1;
+    return schedule.some(s => {
+      if (s.date !== today) return false;
+      const ssi = slots.indexOf(s.start);
+      const eei = ssi + s.length - 1;
+      return !(ei < ssi || si > eei);
+    });
+  }
+
   function saveData() {
     localStorage.setItem("scheduler_items", JSON.stringify(items));
     localStorage.setItem("scheduler_schedule", JSON.stringify(schedule));
   }
 
-  // 初期化
-  function init() {
-    renderItems();
+  function saveTemplate() {
+    localStorage.setItem("scheduler_template", JSON.stringify(schedule.filter(s => s.date === today)));
+    alert("テンプレートを保存しました");
+  }
+
+  function loadTemplate() {
+    const t = localStorage.getItem("scheduler_template");
+    if (!t) return alert("テンプレートがありません");
+    const data = JSON.parse(t).map(s => ({...s, date: today}));
+    schedule = schedule.concat(data);
+    saveData();
     renderTimeline();
   }
 
-  addItemBtn.onclick = () => {
-    const val = newItemInput.value.trim();
-    if(!val) {
-      alert("項目名を入力してください");
-      return;
-    }
-    if(items.includes(val)) {
-      alert("既に同じ項目があります");
-      return;
-    }
+  function showHistory() {
+    const grouped = {};
+    schedule.forEach(s => {
+      if (!grouped[s.date]) grouped[s.date] = [];
+      grouped[s.date].push(`${s.start} ${s.item}（${s.length * 30}分）`);
+    });
+    let html = "";
+    Object.keys(grouped).sort().forEach(d => {
+      html += `<h3>${d}</h3><ul>` + grouped[d].map(e => `<li>${e}</li>`).join("") + "</ul>";
+    });
+    modalContent.innerHTML = html;
+    document.getElementById("modal").style.display = "block";
+  }
+
+  function showSummary() {
+    const summary = {};
+    schedule.forEach(s => {
+      if (!summary[s.date]) summary[s.date] = 0;
+      summary[s.date] += s.length * 30;
+    });
+    const labels = Object.keys(summary).sort();
+    const data = labels.map(d => summary[d]);
+    modalContent.innerHTML = `<canvas id='summaryChart'></canvas>`;
+    document.getElementById("modal").style.display = "block";
+    new Chart(document.getElementById('summaryChart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: '学習時間（分）',
+          data,
+          backgroundColor: '#3b82f6'
+        }]
+      },
+      options: {
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+  }
+
+  document.getElementById("addItemBtn").onclick = () => {
+    const val = document.getElementById("newItemInput").value.trim();
+    if (!val) return;
+    if (items.includes(val)) return alert("重複しています");
     items.push(val);
-    newItemInput.value = "";
     saveData();
     renderItems();
   };
 
-  init();
+  renderItems();
+  renderTimeline();
 </script>
 </body>
 </html>
