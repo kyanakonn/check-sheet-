@@ -3,55 +3,18 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>学習チェックリスト＆予定表（30分刻み）</title>
+<title>自由チェックリスト＆予定表テンプレ管理</title>
 <style>
   body {
     font-family: "Helvetica Neue", Arial, sans-serif;
+    max-width: 700px;
+    margin: auto;
     padding: 1em;
     background: #f8fafc;
-    max-width: 600px;
-    margin: auto;
   }
   h1, h2 {
     text-align: center;
     color: #334155;
-  }
-  label {
-    display: flex;
-    align-items: center;
-    margin: 0.6em 0;
-    font-size: 1.1em;
-  }
-  input[type="checkbox"] {
-    width: 1.4em;
-    height: 1.4em;
-    margin-right: 0.5em;
-  }
-  input[type="text"], select {
-    flex: 1;
-    font-size: 1em;
-    padding: 0.3em 0.5em;
-  }
-  button {
-    margin: 1em auto;
-    padding: 0.7em 2em;
-    font-size: 1em;
-    background-color: #2563eb;
-    border: none;
-    border-radius: 6px;
-    color: white;
-    cursor: pointer;
-    display: block;
-  }
-  button:disabled {
-    background-color: #999;
-    cursor: not-allowed;
-  }
-  #message {
-    text-align: center;
-    margin-top: 0.5em;
-    color: #ef4444;
-    font-weight: bold;
   }
   #tabs {
     text-align: center;
@@ -61,12 +24,50 @@
     margin: 0 0.5em;
     padding: 0.5em 1.5em;
     font-weight: bold;
+    cursor: pointer;
   }
-  #checklist-view, #schedule-view {
+  #tabs button.active {
+    background-color: #2563eb;
+    color: white;
+    border-radius: 5px;
+  }
+  section {
     display: none;
   }
-  #checklist-view.active, #schedule-view.active {
+  section.active {
     display: block;
+  }
+  label {
+    display: flex;
+    align-items: center;
+    margin: 0.5em 0;
+  }
+  input[type="checkbox"] {
+    width: 1.3em;
+    height: 1.3em;
+    margin-right: 0.5em;
+  }
+  input[type="text"], select {
+    font-size: 1em;
+    padding: 0.3em 0.5em;
+    margin-right: 0.5em;
+    flex: 1;
+  }
+  button, .small-btn {
+    padding: 0.4em 1em;
+    background-color: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .small-btn {
+    font-size: 0.8em;
+    padding: 0.3em 0.6em;
+  }
+  button:disabled, .small-btn:disabled {
+    background-color: #999;
+    cursor: not-allowed;
   }
   table {
     width: 100%;
@@ -78,231 +79,351 @@
     padding: 0.4em 0.6em;
     text-align: center;
   }
+  .flex-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.8em;
+  }
 </style>
 </head>
 <body>
-<h1>学習チェックリスト＆予定表</h1>
+<h1>自由チェックリスト＆予定表テンプレ管理</h1>
 
 <div id="tabs">
-  <button id="tabChecklist" class="active">チェックリスト</button>
-  <button id="tabSchedule">予定表（30分刻み）</button>
+  <button id="tabTemplates" class="active">テンプレ管理</button>
+  <button id="tabItems">項目管理</button>
+  <button id="tabSchedule">予定表編集</button>
+  <button id="tabChecklist">チェックリスト</button>
 </div>
 
-<!-- チェックリスト画面 -->
-<div id="checklist-view" class="active">
-  <form id="checklist-form">
-    <!-- 項目はここにJSで追加 -->
-  </form>
-  <button id="saveChecklistBtn">保存</button>
-  <div id="message"></div>
-</div>
+<!-- テンプレート管理 -->
+<section id="sectionTemplates" class="active">
+  <h2>テンプレート一覧</h2>
+  <div class="flex-row">
+    <input type="text" id="newTemplateName" placeholder="新規テンプレート名" />
+    <button id="btnAddTemplate">追加</button>
+  </div>
+  <select id="templateList" size="5" style="width:100%;"></select>
+  <div style="margin-top:0.5em; text-align:right;">
+    <button id="btnLoadTemplate">読み込み</button>
+    <button id="btnDeleteTemplate" style="background:#ef4444;">削除</button>
+  </div>
+</section>
 
-<!-- 予定表画面 -->
-<div id="schedule-view">
+<!-- 項目管理 -->
+<section id="sectionItems">
+  <h2>項目管理</h2>
+  <div class="flex-row">
+    <input type="text" id="newItemName" placeholder="新規項目名" />
+    <button id="btnAddItem">追加</button>
+  </div>
+  <ul id="itemList" style="list-style:none; padding-left:0;"></ul>
+</section>
+
+<!-- 予定表編集 -->
+<section id="sectionSchedule">
+  <h2>予定表編集（8:00〜23:00 30分刻み）</h2>
   <table>
-    <thead>
-      <tr><th>時間</th><th>予定</th></tr>
-    </thead>
-    <tbody id="scheduleBody">
-      <!-- JSで30分刻みのスロット作成 -->
-    </tbody>
+    <thead><tr><th>時間</th><th>予定項目</th></tr></thead>
+    <tbody id="scheduleBody"></tbody>
   </table>
-  <button id="saveScheduleBtn">予定保存</button>
-</div>
+  <button id="btnSaveSchedule" style="margin-top:1em;">予定表保存</button>
+</section>
+
+<!-- チェックリスト -->
+<section id="sectionChecklist">
+  <h2>チェックリスト</h2>
+  <form id="checklistForm"></form>
+  <button id="btnSaveChecklist" style="margin-top:1em;">チェックリスト保存</button>
+</section>
 
 <script>
-  const standardItems = [
-    "英単語100語",
-    "長文1本＋音読",
-    "古文単語＋助動詞",
-    "古文読解・文法演習",
-    "漢文の句法学習",
-    "世界史 教科書精読",
-    "世界史 一問一答",
-    "夜の復習10分"
-  ];
-
-  // localStorageキー
+  // 定数
+  const TIME_START_HOUR = 8;
+  const TIME_END_HOUR = 23;
+  const TIME_SLOT_MINUTES = 30;
   const TODAY = new Date().toISOString().slice(0,10);
-  const CUSTOM_ITEMS_KEY = `customItems-${TODAY}`;
-  const CHECKED_ITEMS_KEY = `checkedItems-${TODAY}`;
-  const SCHEDULE_KEY = `schedule-${TODAY}`;
 
-  // DOM要素
-  const checklistForm = document.getElementById("checklist-form");
-  const saveChecklistBtn = document.getElementById("saveChecklistBtn");
-  const messageEl = document.getElementById("message");
-  const scheduleBody = document.getElementById("scheduleBody");
-  const saveScheduleBtn = document.getElementById("saveScheduleBtn");
-  const tabChecklist = document.getElementById("tabChecklist");
+  // DOM Elements
+  const tabTemplates = document.getElementById("tabTemplates");
+  const tabItems = document.getElementById("tabItems");
   const tabSchedule = document.getElementById("tabSchedule");
-  const checklistView = document.getElementById("checklist-view");
-  const scheduleView = document.getElementById("schedule-view");
+  const tabChecklist = document.getElementById("tabChecklist");
 
-  // チェックリスト項目を表示する関数
-  function renderChecklist() {
-    checklistForm.innerHTML = "";
-    // 標準項目
-    standardItems.forEach((item, i) => {
-      checklistForm.insertAdjacentHTML("beforeend",
-        `<label><input type="checkbox" id="item-${i}" data-name="${item}">${item}</label>`);
+  const sectionTemplates = document.getElementById("sectionTemplates");
+  const sectionItems = document.getElementById("sectionItems");
+  const sectionSchedule = document.getElementById("sectionSchedule");
+  const sectionChecklist = document.getElementById("sectionChecklist");
+
+  const newTemplateName = document.getElementById("newTemplateName");
+  const btnAddTemplate = document.getElementById("btnAddTemplate");
+  const templateList = document.getElementById("templateList");
+  const btnLoadTemplate = document.getElementById("btnLoadTemplate");
+  const btnDeleteTemplate = document.getElementById("btnDeleteTemplate");
+
+  const newItemName = document.getElementById("newItemName");
+  const btnAddItem = document.getElementById("btnAddItem");
+  const itemList = document.getElementById("itemList");
+
+  const scheduleBody = document.getElementById("scheduleBody");
+  const btnSaveSchedule = document.getElementById("btnSaveSchedule");
+
+  const checklistForm = document.getElementById("checklistForm");
+  const btnSaveChecklist = document.getElementById("btnSaveChecklist");
+
+  // state
+  let templates = JSON.parse(localStorage.getItem("templates") || "[]"); // [{name:"テンプレ1", items:[], schedule:{}}]
+  let currentTemplateIndex = null;
+
+  // --- タブ切り替え ---
+  function showSection(section) {
+    [sectionTemplates, sectionItems, sectionSchedule, sectionChecklist].forEach(s => s.classList.remove("active"));
+    [tabTemplates, tabItems, tabSchedule, tabChecklist].forEach(t => t.classList.remove("active"));
+    if(section === "templates") {
+      sectionTemplates.classList.add("active");
+      tabTemplates.classList.add("active");
+    } else if(section === "items") {
+      sectionItems.classList.add("active");
+      tabItems.classList.add("active");
+    } else if(section === "schedule") {
+      sectionSchedule.classList.add("active");
+      tabSchedule.classList.add("active");
+    } else if(section === "checklist") {
+      sectionChecklist.classList.add("active");
+      tabChecklist.classList.add("active");
+    }
+  }
+  tabTemplates.onclick = () => showSection("templates");
+  tabItems.onclick = () => {
+    if(currentTemplateIndex === null) {
+      alert("先にテンプレートを読み込んでください");
+      return;
+    }
+    renderItemList();
+    showSection("items");
+  };
+  tabSchedule.onclick = () => {
+    if(currentTemplateIndex === null) {
+      alert("先にテンプレートを読み込んでください");
+      return;
+    }
+    renderSchedule();
+    showSection("schedule");
+  };
+  tabChecklist.onclick = () => {
+    if(currentTemplateIndex === null) {
+      alert("先にテンプレートを読み込んでください");
+      return;
+    }
+    renderChecklist();
+    showSection("checklist");
+  };
+
+  // --- テンプレート管理 ---
+  function renderTemplateList() {
+    templateList.innerHTML = "";
+    templates.forEach((tpl, i) => {
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = tpl.name;
+      templateList.appendChild(opt);
     });
-    // カスタム項目
-    const customItems = JSON.parse(localStorage.getItem(CUSTOM_ITEMS_KEY) || "[]");
-    customItems.forEach((item, i) => {
-      checklistForm.insertAdjacentHTML("beforeend",
-        `<label><input type="checkbox" id="custom-${i}" data-name="${item}">${item}</label>`);
+  }
+  btnAddTemplate.onclick = () => {
+    const name = newTemplateName.value.trim();
+    if(!name) {
+      alert("テンプレート名を入力してください");
+      return;
+    }
+    // 重複チェック
+    if(templates.some(t => t.name === name)) {
+      alert("同名のテンプレートが既に存在します");
+      return;
+    }
+    templates.push({name, items:[], schedule:{}});
+    localStorage.setItem("templates", JSON.stringify(templates));
+    newTemplateName.value = "";
+    renderTemplateList();
+  };
+  btnLoadTemplate.onclick = () => {
+    const idx = templateList.value;
+    if(idx === "") {
+      alert("テンプレートを選択してください");
+      return;
+    }
+    currentTemplateIndex = Number(idx);
+    alert(`テンプレート「${templates[currentTemplateIndex].name}」を読み込みました`);
+  };
+  btnDeleteTemplate.onclick = () => {
+    const idx = templateList.value;
+    if(idx === "") {
+      alert("テンプレートを選択してください");
+      return;
+    }
+    if(!confirm(`テンプレート「${templates[idx].name}」を削除してもよろしいですか？`)) return;
+    templates.splice(idx,1);
+    localStorage.setItem("templates", JSON.stringify(templates));
+    currentTemplateIndex = null;
+    renderTemplateList();
+    alert("削除しました");
+  };
+
+  // --- 項目管理 ---
+  function renderItemList() {
+    itemList.innerHTML = "";
+    const items = templates[currentTemplateIndex].items;
+    items.forEach((item, i) => {
+      const li = document.createElement("li");
+      li.style.display = "flex";
+      li.style.alignItems = "center";
+      li.style.marginBottom = "0.4em";
+      li.textContent = item;
+      const delBtn = document.createElement("button");
+      delBtn.textContent = "削除";
+      delBtn.className = "small-btn";
+      delBtn.style.marginLeft = "auto";
+      delBtn.onclick = () => {
+        if(!confirm(`「${item}」を削除しますか？\n予定表やチェックリストからも削除されます`)) return;
+        removeItemFromTemplate(item);
+      };
+      li.appendChild(delBtn);
+      itemList.appendChild(li);
     });
-    loadCheckedState();
+  }
+  btnAddItem.onclick = () => {
+    const name = newItemName.value.trim();
+    if(!name) {
+      alert("項目名を入力してください");
+      return;
+    }
+    addItemToTemplate(name);
+    newItemName.value = "";
+  };
+  function addItemToTemplate(name) {
+    const items = templates[currentTemplateIndex].items;
+    if(items.includes(name)) {
+      alert("同じ名前の項目がすでにあります");
+      return;
+    }
+    items.push(name);
+    saveTemplates();
+    renderItemList();
+  }
+  function removeItemFromTemplate(name) {
+    const tpl = templates[currentTemplateIndex];
+    tpl.items = tpl.items.filter(i => i !== name);
+    // 予定表からも削除
+    Object.keys(tpl.schedule).forEach(k => {
+      if(tpl.schedule[k] === name) delete tpl.schedule[k];
+    });
+    saveTemplates();
+    renderItemList();
   }
 
-  // チェック状態をlocalStorageから読み込んでフォームに反映
-  function loadCheckedState() {
-    const checked = JSON.parse(localStorage.getItem(CHECKED_ITEMS_KEY) || "{}");
-    document.querySelectorAll("#checklist-form input[type=checkbox]").forEach(cb => {
-      const name = cb.getAttribute("data-name");
-      cb.checked = !!checked[name];
-    });
-  }
-
-  // チェック状態を保存
-  function saveCheckedState() {
-    const checked = {};
-    document.querySelectorAll("#checklist-form input[type=checkbox]").forEach(cb => {
-      const name = cb.getAttribute("data-name");
-      checked[name] = cb.checked;
-    });
-    localStorage.setItem(CHECKED_ITEMS_KEY, JSON.stringify(checked));
-  }
-
-  // 30分刻み時間帯を作る関数 (例: 9:00〜21:00)
+  // --- 予定表 ---
   function generateTimeSlots() {
     const slots = [];
-    for(let h=9; h<=21; h++) {
-      slots.push({label: `${String(h).padStart(2,"0")}:00`, value: `${String(h).padStart(2,"0")}:00`});
-      if(h !== 21) {
-        slots.push({label: `${String(h).padStart(2,"0")}:30`, value: `${String(h).padStart(2,"0")}:30`});
+    for(let h=TIME_START_HOUR; h<=TIME_END_HOUR; h++) {
+      slots.push({label:`${String(h).padStart(2,"0")}:00`, value:`${String(h).padStart(2,"0")}:00`});
+      if(h !== TIME_END_HOUR) {
+        slots.push({label:`${String(h).padStart(2,"0")}:30`, value:`${String(h).padStart(2,"0")}:30`});
       }
     }
     return slots;
   }
-
-  // 予定表を表示
   function renderSchedule() {
+    const tpl = templates[currentTemplateIndex];
     scheduleBody.innerHTML = "";
     const slots = generateTimeSlots();
-    const schedule = JSON.parse(localStorage.getItem(SCHEDULE_KEY) || "{}");
-    const customItems = JSON.parse(localStorage.getItem(CUSTOM_ITEMS_KEY) || "[]");
-
     slots.forEach(slot => {
-      const selId = `select-${slot.value}`;
-      const inputId = `input-${slot.value}`;
-      const val = schedule[slot.value] || "";
-
-      // 選択肢は標準項目 + カスタム項目 + 空欄
-      let options = `<option value="">（何もしない・自由入力）</option>`;
-      standardItems.forEach(item => {
-        options += `<option value="${item}">${item}</option>`;
-      });
-      customItems.forEach(item => {
-        options += `<option value="${item}">${item}</option>`;
-      });
-
-      // 予定表の1行を作成
-      scheduleBody.insertAdjacentHTML("beforeend", `
-        <tr>
-          <td>${slot.label}</td>
-          <td>
-            <select id="${selId}" style="width:70%;">
-              ${options}
-            </select>
-            <input type="text" id="${inputId}" placeholder="新規予定を入力" style="width:28%; margin-left:2%;" />
-            <button type="button" data-slot="${slot.value}" class="addCustomBtn">追加</button>
-          </td>
-        </tr>
-      `);
-
-      // 選択肢にあれば選択状態にする
-      if(val && document.getElementById(selId)) {
-        document.getElementById(selId).value = val;
-      }
-    });
-
-    // イベントリスナーを後付け
-    document.querySelectorAll(".addCustomBtn").forEach(btn => {
-      btn.addEventListener("click", e => {
-        const slot = e.target.dataset.slot;
-        const inputEl = document.getElementById(`input-${slot}`);
-        const val = inputEl.value.trim();
-        if(!val) {
-          alert("予定名を入力してください");
-          return;
-        }
-        addCustomItem(val);
-        // 選択肢に追加してセット
-        const selectEl = document.getElementById(`select-${slot}`);
+      const tr = document.createElement("tr");
+      const tdTime = document.createElement("td");
+      tdTime.textContent = slot.label;
+      const tdSelect = document.createElement("td");
+      const select = document.createElement("select");
+      select.style.width = "100%";
+      // 空欄追加
+      const optNone = document.createElement("option");
+      optNone.value = "";
+      optNone.textContent = "（なし）";
+      select.appendChild(optNone);
+      // 項目追加
+      tpl.items.forEach(item => {
         const opt = document.createElement("option");
-        opt.value = val;
-        opt.textContent = val;
-        selectEl.appendChild(opt);
-        selectEl.value = val;
-        inputEl.value = "";
+        opt.value = item;
+        opt.textContent = item;
+        select.appendChild(opt);
       });
+      // 予定の割当値セット
+      select.value = tpl.schedule[slot.value] || "";
+      tdSelect.appendChild(select);
+      tr.appendChild(tdTime);
+      tr.appendChild(tdSelect);
+      scheduleBody.appendChild(tr);
     });
   }
-
-  // カスタム項目を追加し保存
-  function addCustomItem(itemName) {
-    const customItems = JSON.parse(localStorage.getItem(CUSTOM_ITEMS_KEY) || "[]");
-    if(customItems.includes(itemName)) return; // 重複防止
-    customItems.push(itemName);
-    localStorage.setItem(CUSTOM_ITEMS_KEY, JSON.stringify(customItems));
-    renderChecklist();
-  }
-
-  // 予定表の選択内容を保存
-  function saveSchedule() {
+  btnSaveSchedule.onclick = () => {
+    const tpl = templates[currentTemplateIndex];
     const slots = generateTimeSlots();
-    const schedule = {};
+    const newSchedule = {};
     slots.forEach(slot => {
-      const selEl = document.getElementById(`select-${slot.value}`);
-      if(selEl) {
-        schedule[slot.value] = selEl.value;
+      const select = scheduleBody.querySelector(`select[value="${slot.value}"]`) || scheduleBody.children.find(tr => tr.children[0].textContent === slot.label)?.children[1].querySelector("select");
+      if(select) {
+        newSchedule[slot.value] = select.value;
       }
     });
-    localStorage.setItem(SCHEDULE_KEY, JSON.stringify(schedule));
-    alert("予定表を保存しました！");
+    tpl.schedule = newSchedule;
+    saveTemplates();
+    alert("予定表を保存しました");
+  };
+
+  // --- チェックリスト ---
+  function renderChecklist() {
+    checklistForm.innerHTML = "";
+    const tpl = templates[currentTemplateIndex];
+    tpl.items.forEach((item,i) => {
+      checklistForm.insertAdjacentHTML("beforeend",
+        `<label><input type="checkbox" id="chk-${i}" data-name="${item}">${item}</label>`);
+    });
+    loadCheckedState();
   }
-
-  // タブ切り替え
-  tabChecklist.addEventListener("click", () => {
-    tabChecklist.classList.add("active");
-    tabSchedule.classList.remove("active");
-    checklistView.classList.add("active");
-    scheduleView.classList.remove("active");
-  });
-  tabSchedule.addEventListener("click", () => {
-    tabSchedule.classList.add("active");
-    tabChecklist.classList.remove("active");
-    scheduleView.classList.add("active");
-    checklistView.classList.remove("active");
-  });
-
-  // 初期表示処理
-  function init() {
-    renderChecklist();
-    renderSchedule();
+  function loadCheckedState() {
+    const key = `checked-${templates[currentTemplateIndex].name}`;
+    const checked = JSON.parse(localStorage.getItem(key) || "{}");
+    checklistForm.querySelectorAll("input[type=checkbox]").forEach(cb => {
+      const name = cb.dataset.name;
+      cb.checked = !!checked[name];
+    });
   }
-
-  saveChecklistBtn.addEventListener("click", () => {
+  function saveCheckedState() {
+    const key = `checked-${templates[currentTemplateIndex].name}`;
+    const checked = {};
+    checklistForm.querySelectorAll("input[type=checkbox]").forEach(cb => {
+      checked[cb.dataset.name] = cb.checked;
+    });
+    localStorage.setItem(key, JSON.stringify(checked));
+  }
+  btnSaveChecklist.onclick = () => {
     saveCheckedState();
-    alert("チェックリストを保存しました！");
-  });
-  saveScheduleBtn.addEventListener("click", () => {
-    saveSchedule();
-  });
+    alert("チェックリストを保存しました");
+  };
 
-  window.onload = init;
+  // --- 共通関数 ---
+  function saveTemplates() {
+    localStorage.setItem("templates", JSON.stringify(templates));
+  }
+  function loadTemplates() {
+    templates = JSON.parse(localStorage.getItem("templates") || "[]");
+  }
+
+  // --- 初期化 ---
+  function init() {
+    loadTemplates();
+    renderTemplateList();
+    showSection("templates");
+  }
+
+  init();
 </script>
 </body>
 </html>
